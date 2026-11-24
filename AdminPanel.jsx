@@ -8,7 +8,18 @@ const ACTION_LABELS = {
   revoke_admin: "Admin-Rechte entzogen",
   cancel_booking: "Fremde Buchung storniert",
   password_reset: "Passwort-Reset gesendet",
+  temp_password: "Vorläufiges Passwort gesetzt",
 };
+
+// Gut vorlesbares Zufallspasswort, z. B. "kmt7-qx4h-9pwe": ohne leicht
+// verwechselbare Zeichen (0/o, 1/l/i), damit man es mündlich weitergeben kann.
+function generateTempPassword() {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = new Uint32Array(12);
+  crypto.getRandomValues(bytes);
+  const s = Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  return `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
+}
 
 // Zwei-Klick-Bestätigung für heikle Aktionen (Admin entfernen, fremde
 // Buchung stornieren) statt eines Browser-confirm()-Popups. Setzt sich
@@ -107,36 +118,25 @@ export default function AdminPanel({ myUserId, onClose }) {
     await loadUsers();
   };
 
-  // Schickt der Person die normale "Passwort vergessen"-Mail. Die
-  // E-Mail-Adresse liefert nur die Datenbank-Funktion, und nur an Admins;
-  // sie protokolliert den Vorgang auch gleich. Das neue Passwort legt die
-  // Person selbst fest -- der Admin sieht es nie.
-  const sendPasswordReset = async (user) => {
+  // Setzt für die Person ein zufälliges vorläufiges Passwort (ohne
+  // E-Mail-Versand). Der Admin gibt es mündlich/per Teams weiter, die Person
+  // ändert es nach dem Login selbst über "Passwort ändern". Die Datenbank
+  // prüft die Admin-Rechte und protokolliert den Vorgang.
+  const setTempPassword = async (user) => {
     setBusyId(user.id);
     setError(null);
     setNotice(null);
-    const { data: email, error: rpcErr } = await supabase.rpc("admin_password_reset_email", {
+    const password = generateTempPassword();
+    const { error: rpcErr } = await supabase.rpc("admin_set_temp_password", {
       target: user.id,
-    });
-    if (rpcErr || !email) {
-      setBusyId(null);
-      setError("E-Mail-Adresse konnte nicht ermittelt werden.");
-      return;
-    }
-    const { error: mailErr } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname,
+      new_password: password,
     });
     setBusyId(null);
-    if (mailErr) {
-      const limit = mailErr.status === 429 || /rate limit/i.test(mailErr.message || "");
-      setError(
-        limit
-          ? "Mail-Limit erreicht. Ohne eigenen Mailversand sind nur wenige Mails pro Stunde möglich – bitte später erneut versuchen."
-          : `Mail konnte nicht gesendet werden: ${mailErr.message}`
-      );
+    if (rpcErr) {
+      setError(`Passwort konnte nicht gesetzt werden: ${rpcErr.message}`);
       return;
     }
-    setNotice(`Mail zum Zurücksetzen an ${user.display_name} gesendet.`);
+    setNotice({ name: user.display_name, password });
     setLog(null); // Protokoll beim nächsten Öffnen neu laden
   };
 
@@ -188,7 +188,15 @@ export default function AdminPanel({ myUserId, onClose }) {
         </div>
 
         {error && <div className="modal-error">{error}</div>}
-        {notice && <div className="admin-notice">{notice}</div>}
+        {notice && (
+          <div className="admin-notice">
+            Vorläufiges Passwort für <strong>{notice.name}</strong>:{" "}
+            <strong className="admin-temp-pw">{notice.password}</strong>
+            <br />
+            Bitte jetzt notieren und weitergeben – es wird nicht noch einmal angezeigt. Die Person
+            sollte es nach dem Login über „Passwort ändern“ ersetzen.
+          </div>
+        )}
 
         <div className="admin-body">
           {tab === "users" &&
@@ -213,9 +221,9 @@ export default function AdminPanel({ myUserId, onClose }) {
                     <div className="admin-row-actions">
                       <ConfirmButton
                         label="Passwort-Reset"
-                        confirmLabel="Mail senden?"
+                        confirmLabel="Neues setzen?"
                         disabled={busyId === u.id}
-                        onConfirm={() => sendPasswordReset(u)}
+                        onConfirm={() => setTempPassword(u)}
                       />
                       <ConfirmButton
                         label={u.is_admin ? "Entfernen" : "Admin machen"}

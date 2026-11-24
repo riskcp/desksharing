@@ -300,6 +300,48 @@ $function$;
 revoke execute on function public.admin_password_reset_email(uuid) from public, anon;
 grant execute on function public.admin_password_reset_email(uuid) to authenticated, service_role;
 
+-- Admin: vorläufiges Passwort setzen (ohne E-Mail-Versand).
+-- Nur in der Risiko-App: Ersatz für den Passwort-Reset per Mail, weil der
+-- Supabase-Standardversand nur an Mitglieder des Supabase-Teams zustellt.
+create extension if not exists pgcrypto with schema extensions;
+
+create or replace function public.admin_set_temp_password(target uuid, new_password text)
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if not public.is_admin() then
+    raise exception 'Nur Admins dürfen das.';
+  end if;
+
+  if new_password is null or length(new_password) < 6 then
+    raise exception 'Das Passwort muss mindestens 6 Zeichen haben.';
+  end if;
+
+  update auth.users
+     set encrypted_password = extensions.crypt(new_password, extensions.gen_salt('bf')),
+         updated_at = now()
+   where id = target;
+
+  if not found then
+    raise exception 'Nutzer nicht gefunden.';
+  end if;
+
+  insert into public.admin_actions (actor_id, actor_name, action, target_user_id, target_name)
+  select
+    auth.uid(),
+    (select display_name from public.profiles where id = auth.uid()),
+    'temp_password',
+    target,
+    (select display_name from public.profiles where id = target);
+end;
+$function$;
+
+revoke execute on function public.admin_set_temp_password(uuid, text) from public, anon;
+grant execute on function public.admin_set_temp_password(uuid, text) to authenticated, service_role;
+
 
 -- ------------------------------------------------------------
 -- 4) Trigger

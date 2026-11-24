@@ -51,15 +51,24 @@ where id = (select id from auth.users where email = 'name@beispiel.de');
 - **Nur ein Platz pro Person und Tag**
 - "Wer ist da?" – Übersicht mit Namenssuche, wer an einem Tag wo sitzt
 - "Meine Buchungen" mit Einzel- und Serienstornierung
-- Admin-Bereich: Admin-Rechte vergeben/entziehen, Passwort-Reset-Mail senden,
+- Admin-Bereich: Admin-Rechte vergeben/entziehen, vorläufiges Passwort setzen,
   fremde Buchungen stornieren, Protokoll aller Admin-Aktionen
 - Live-Updates ohne Neuladen, Auslastungsanzeige
 - Grundriss behält auf allen Geräten dieselben Proportionen
 - Keine stundenweise Buchung (kein Besprechungsraum)
 
-## Mailversand
-Supabase-Standardversand (wenige Mails pro Stunde). Reicht für ca. 10 Nutzer.
-Bei Engpass kann ein Admin per SQL ein vorläufiges Passwort setzen.
+## Mailversand und Passwort vergessen
+- Die E-Mail-Bestätigung bei der Registrierung ist in Supabase ausgeschaltet
+  (Authentication → Sign In / Providers → Email → „Confirm email“ aus).
+- Ohne eigenen Mailserver stellt Supabase Mails nur an Mitglieder des
+  Supabase-Teams zu. Deshalb gibt es **keinen Passwort-Reset per Mail**.
+- Stattdessen: Admin-Bereich → Nutzer → „Passwort-Reset“. Die App erzeugt ein
+  zufälliges vorläufiges Passwort und zeigt es einmal an. Der Admin gibt es
+  weiter, die Person ändert es nach dem Login über „Passwort ändern“.
+  Jeder Vorgang steht im Protokoll.
+- Auf der Login-Seite verweist „Passwort vergessen?“ auf einen Admin.
+- Die Datenbank-Funktion dazu (`admin_set_temp_password`) steht in
+  `schema-setup.sql` und einzeln in `admin-temp-password.sql`.
 
 ## Barrierefreiheit
 Status wird **nicht nur** über Farbe unterschieden:

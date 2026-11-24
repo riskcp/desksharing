@@ -78,17 +78,6 @@ export default function AuthGate({ notice }) {
     setInfo("Konto erstellt! Du kannst dich jetzt direkt einloggen.");
   };
 
-  const handleReset = async (e) => {
-    e.preventDefault();
-    resetMessages();
-    setBusy(true);
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname,
-    });
-    setBusy(false);
-    setInfo("Falls ein Konto mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet.");
-  };
-
   return (
     <div className="name-gate">
       <div className="auth-tabs">
@@ -180,14 +169,15 @@ export default function AuthGate({ notice }) {
       )}
 
       {mode === MODES.RESET && (
-        <form className="name-gate-form" onSubmit={handleReset}>
-          <label>
-            E-Mail
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <button type="submit" className="btn-primary" disabled={busy}>
-            {busy ? "Einen Moment…" : "Link zum Zurücksetzen senden"}
-          </button>
+        // Kein Reset per Mail: Der Supabase-Standardversand stellt nur an
+        // Mitglieder des Supabase-Teams zu. Stattdessen setzt ein Admin im
+        // Admin-Bereich ein vorläufiges Passwort.
+        <div className="name-gate-form">
+          <div className="modal-info">
+            Bitte wende dich an einen Admin der App. Er setzt dir ein vorläufiges Passwort, mit
+            dem du dich einloggen kannst. Danach kannst du es über „Passwort ändern“ selbst
+            ersetzen.
+          </div>
           <button
             type="button"
             className="link-btn"
@@ -198,7 +188,7 @@ export default function AuthGate({ notice }) {
           >
             Zurück zum Login
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
