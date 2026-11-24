@@ -23,9 +23,11 @@ const VB_H = ROOM_H + 20; // 418
 const WALL_RIGHT = O + ROOM_W + 1.5;  // 182.5
 const WALL_BOTTOM = O + ROOM_H + 1.5; // 409.5
 
-// Gleicher Maßstab auf dem Bildschirm wie in der Finance-App
-// (dort: viewBox 400 breit, max. 380px angezeigt).
-const MAX_WIDTH_PX = Math.round((VB_W * 380) / 400);
+// Anzeigegröße: Der Grundriss wird so groß dargestellt, dass er auf dem
+// Bildschirm etwa so hoch ist wie der Grundriss der Finance-App (ca. 740px).
+// Auf schmalen Handys wird er automatisch kleiner skaliert.
+const TARGET_HEIGHT_PX = 740;
+const MAX_WIDTH_PX = Math.round((VB_W * TARGET_HEIGHT_PX) / VB_H);
 
 const DESK_W = 54;
 const DESK_H = 32;
@@ -216,9 +218,6 @@ export default function FloorPlan({ bookings, myUserId, onSelect }) {
         <g className="fp-decor" aria-hidden="true">
           <rect x={CABINET.x} y={CABINET.y} width={CABINET.w} height={CABINET.h} />
         </g>
-        <text x={CABINET.x + CABINET.w / 2} y={CABINET.y - 5} className="fp-sub">
-          Schrank
-        </text>
 
         {/* Tischgruppen */}
         <DeskPair groupId="G1" y={G1_Y} {...common} />
