@@ -1,0 +1,22 @@
+name: Supabase wachhalten
+
+on:
+  schedule:
+    - cron: "0 6 * * 1,4"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Supabase anpingen
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://wglzcgnjfrfuseqhoipo.supabase.co/auth/v1/health" \
+            -H "apikey: sb_publishable_C-UXOLvVow5hT1lBdaZgEA_zbPOMFL3")
+          echo "HTTP-Status: $code"
+          if [ "$code" != "200" ]; then
+            echo "Ping fehlgeschlagen"
+            exit 1
+          fi
+          echo "Supabase ist erreichbar."
