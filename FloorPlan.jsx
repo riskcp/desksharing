@@ -23,11 +23,14 @@ const VB_H = ROOM_H + 20; // 418
 const WALL_RIGHT = O + ROOM_W + 1.5;  // 182.5
 const WALL_BOTTOM = O + ROOM_H + 1.5; // 409.5
 
-// Anzeigegröße: Der Grundriss wird so groß dargestellt, dass er auf dem
-// Bildschirm etwa so hoch ist wie der Grundriss der Finance-App (ca. 740px).
-// Auf schmalen Handys wird er automatisch kleiner skaliert.
-const TARGET_HEIGHT_PX = 740;
-const MAX_WIDTH_PX = Math.round((VB_W * TARGET_HEIGHT_PX) / VB_H);
+// Anzeigegröße: am PC höchstens ca. 560px hoch. Auf dem Handy richtet sich
+// die Größe nach der Bildschirmhöhe, damit der ganze Grundriss unter Kopf-
+// zeile und Datumsauswahl auf einen Blick passt (aber nie winzig wird).
+const TARGET_HEIGHT_PX = 560;
+const RATIO = VB_W / VB_H;
+const MAX_WIDTH_PX = Math.round(TARGET_HEIGHT_PX * RATIO);
+const MIN_WIDTH_PX = Math.round(320 * RATIO);
+const PLAN_MAX_WIDTH = `min(${MAX_WIDTH_PX}px, max(${MIN_WIDTH_PX}px, calc((100svh - 340px) * ${RATIO.toFixed(4)})))`;
 
 const DESK_W = 54;
 const DESK_H = 32;
@@ -200,7 +203,7 @@ function Door({ hingeY, opens }) {
 export default function FloorPlan({ bookings, myUserId, onSelect }) {
   const common = { bookings, myUserId, onSelect };
   return (
-    <div className="building" style={{ maxWidth: `${MAX_WIDTH_PX}px` }}>
+    <div className="building" style={{ maxWidth: PLAN_MAX_WIDTH }}>
       <svg
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         className="floorplan-svg"
