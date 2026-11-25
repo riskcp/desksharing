@@ -1,22 +1,63 @@
 name: Supabase wachhalten
 
+# Zwei Aufgaben, damit die App auch nach langen Pausen (Urlaub, Feiertage)
+# erreichbar bleibt:
+#
+# 1. Datenbank-Abfrage zweimal pro Woche: Kostenlose Supabase-Projekte
+#    werden nach ca. einer Woche ohne Aktivität pausiert. Die Abfrage der
+#    Funktion "keepalive_ping" erzeugt echte Datenbank-Aktivität.
+#
+# 2. Kleiner Eintrag ins Repository, wenn der letzte Eintrag älter als
+#    30 Tage ist: GitHub schaltet zeitgesteuerte Jobs in öffentlichen
+#    Repositories nach 60 Tagen ohne Aktivität ab. Der Eintrag ändert nur
+#    die Datei ".github/keepalive.txt" und löst keine Veröffentlichung aus.
+
 on:
   schedule:
-    - cron: "0 6 * * 1,4"
+    - cron: "0 6 * * 1,4" # Montag und Donnerstag, 6 Uhr UTC
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Supabase anpingen
+      - name: Supabase-Datenbank anfragen
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://wglzcgnjfrfuseqhoipo.supabase.co/auth/v1/health" \
-            -H "apikey: sb_publishable_C-UXOLvVow5hT1lBdaZgEA_zbPOMFL3")
-          echo "HTTP-Status: $code"
+          code=$(curl -s -o response.txt -w "%{http_code}" -X POST \
+            "https://wglzcgnjfrfuseqhoipo.supabase.co/rest/v1/rpc/keepalive_ping" \
+            -H "apikey: sb_publishable_C-UXOLvVow5hT1lBdaZgEA_zbPOMFL3" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "HTTP-Status: $code, Antwort: $(cat response.txt)"
           if [ "$code" != "200" ]; then
-            echo "Ping fehlgeschlagen"
+            echo "Datenbank-Abfrage fehlgeschlagen"
             exit 1
           fi
-          echo "Supabase ist erreichbar."
+          echo "Supabase-Datenbank ist erreichbar."
+
+  repo-aktiv-halten:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v6
+
+      - name: Bei Bedarf kleinen Eintrag schreiben
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          days=$(( (now - last) / 86400 ))
+          echo "Letzter Eintrag vor $days Tagen."
+          if [ "$days" -lt 30 ]; then
+            echo "Nicht nötig."
+            exit 0
+          fi
+          date -u +"%Y-%m-%d %H:%M UTC" > .github/keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          git commit -m "Wachhalten: Repository aktiv halten"
+          git push
+          echo "Eintrag geschrieben."
