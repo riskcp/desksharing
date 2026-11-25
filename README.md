@@ -6,7 +6,18 @@ eigenes Supabase-Projekt, keine Verbindung zu anderen Apps.
 ## Supabase einrichten
 1. Neues Projekt anlegen, Region **EU (Frankfurt)**.
 2. `schema-setup.sql` einmal komplett im SQL-Editor ausführen
-   (legt Tabellen, Login, Rechte, Admin-Funktionen und Sicherheits-Trigger an).
+   (legt Tabellen, Login, Rechte, Admin-Funktionen, Sicherheits-Trigger,
+   Freigaben und die Wachhalte-Funktion an).
+
+Die einzelnen SQL-Dateien `grants-fix.sql`, `admin-temp-password.sql` und
+`keepalive-ping.sql` sind die Nachträge, mit denen das bestehende Projekt
+im November 2026 ergänzt wurde. Sie stecken alle bereits in
+`schema-setup.sql` – bei einem neuen Projekt also nicht extra ausführen.
+
+**Wichtig bei neuen Supabase-Projekten (seit Mai 2026):** Neue Tabellen sind
+nicht mehr automatisch für die App freigegeben. Ohne den Abschnitt
+„Freigaben“ in `schema-setup.sql` kann die App weder Profile lesen noch
+buchen (Symptome: kein Admin-Button, falscher Name, Buchen schlägt fehl).
 3. Zugangsdaten (Project URL + Publishable key) eintragen in:
    - `supabaseClient.js`
    - `.github/workflows/keepalive.yml`
@@ -23,8 +34,19 @@ Ohne das landen Bestätigungs- und Passwort-Reset-Links im Nichts.
 - Settings → Pages → Source: **GitHub Actions**.
 - `vite.config.js` → `base: '/desksharing/'` muss exakt dem Repo-Namen entsprechen.
 - Jeder Commit auf `main` baut und veröffentlicht automatisch.
-- `keepalive.yml` pingt Supabase zweimal pro Woche an, damit das kostenlose
-  Projekt nicht wegen Inaktivität pausiert wird.
+
+## Wachhalten (`keepalive.yml`)
+Läuft montags und donnerstags um 6 Uhr UTC (oder per Hand unter Actions →
+„Supabase wachhalten“ → Run workflow) und macht zwei Dinge:
+1. **Datenbank-Abfrage** der Funktion `keepalive_ping` – kostenlose
+   Supabase-Projekte werden sonst nach ca. einer Woche ohne Aktivität pausiert.
+2. **Repository aktiv halten:** Ist der letzte Eintrag im Repository älter als
+   30 Tage, schreibt der Job das aktuelle Datum in `.github/keepalive.txt`.
+   GitHub schaltet zeitgesteuerte Jobs in öffentlichen Repositories sonst nach
+   60 Tagen ohne Aktivität ab. Dieser Eintrag löst keine Veröffentlichung aus.
+
+Wenn die App trotzdem einmal nicht lädt: in Supabase prüfen, ob das Projekt
+pausiert ist, und es dort über den angezeigten Button wieder starten.
 
 ## Ersten Admin festlegen
 Die Person registriert sich normal in der App. Danach im SQL-Editor:
@@ -56,6 +78,10 @@ where id = (select id from auth.users where email = 'name@beispiel.de');
 - Live-Updates ohne Neuladen, Auslastungsanzeige
 - Grundriss behält auf allen Geräten dieselben Proportionen
 - Keine stundenweise Buchung (kein Besprechungsraum)
+- Verständliche Fehlermeldungen beim Buchen: Die App nennt für jeden nicht
+  gebuchten Tag den Grund (Platz belegt / schon anderer Platz an dem Tag /
+  Platz nicht buchbar / Datum nicht erlaubt / technischer Fehler mit
+  Originaltext). Logik in `bookingErrors.js`.
 
 ## Mailversand und Passwort vergessen
 - Die E-Mail-Bestätigung bei der Registrierung ist in Supabase ausgeschaltet

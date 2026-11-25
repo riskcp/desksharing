@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { classifyBookingError, describeFailures } from "./bookingErrors";
+import { formatDateLong } from "./dateUtils";
 
 /**
  * crypto.randomUUID gibt es erst ab neueren Browsern (z.B. iOS 15.4).
@@ -49,30 +51,36 @@ export function useBookingActions({ userId, reload, onToast, onClose }) {
     });
 
     // Zuerst ein einziger Aufruf für alle Tage (schnell). Schlägt er fehl,
-    // ist mindestens ein Tag belegt -- dann einzeln nachfassen, um die
-    // übrigen Tage trotzdem zu buchen und zu wissen, welche fehlschlagen.
-    let failed = [];
+    // dann einzeln nachfassen, um die übrigen Tage trotzdem zu buchen und
+    // für jeden fehlgeschlagenen Tag den genauen Grund zu kennen.
+    const failures = [];
     const { error: bulkError } = await supabase.from("bookings").insert(dates.map((d) => toRow(d)));
     if (bulkError) {
-      for (const date of dates) {
-        const { error: singleError } = await supabase.from("bookings").insert(toRow(date));
-        if (singleError) failed.push(date);
+      if (dates.length === 1) {
+        failures.push({ date: dates[0], reason: classifyBookingError(bulkError), error: bulkError });
+      } else {
+        for (const date of dates) {
+          const { error: singleError } = await supabase.from("bookings").insert(toRow(date));
+          if (singleError) {
+            failures.push({ date, reason: classifyBookingError(singleError), error: singleError });
+          }
+        }
       }
     }
 
     setBusy(false);
     await reload();
 
-    const ok = dates.length - failed.length;
-    if (failed.length === 0) {
+    if (failures.length === 0) {
       onClose();
       onToast(dates.length > 1 ? `${dates.length} Tage gebucht.` : "Gebucht.");
-    } else if (ok === 0) {
-      setError("Diese(r) Termin(e) ist/sind bereits belegt.");
-    } else {
-      onClose();
-      onToast(`${ok} von ${dates.length} Tagen gebucht (Rest bereits belegt).`);
+      return;
     }
+
+    // Dialog bleibt offen und zeigt, welche Tage warum nicht gebucht wurden.
+    setError(describeFailures(failures, dates.length, formatDateLong));
+    const ok = dates.length - failures.length;
+    if (ok > 0) onToast(`${ok} von ${dates.length} Tagen gebucht.`);
   };
 
   /**
@@ -95,7 +103,7 @@ export function useBookingActions({ userId, reload, onToast, onClose }) {
 
     setBusy(false);
     if (err) {
-      setError("Stornieren fehlgeschlagen. Bitte erneut versuchen.");
+      setError(`Stornieren fehlgeschlagen: ${err.message || "unbekannter Fehler"}. Bitte erneut versuchen.`);
       return;
     }
 

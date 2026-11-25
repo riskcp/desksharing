@@ -409,3 +409,38 @@ create policy "Nur Admins lesen das Protokoll" on public.admin_actions
 -- 6) Live-Updates
 -- ------------------------------------------------------------
 alter publication supabase_realtime add table public.bookings;
+
+
+-- ------------------------------------------------------------
+-- 7) Freigaben für die App
+-- Neue Supabase-Projekte (seit Mai 2026) geben neue Tabellen nicht mehr
+-- automatisch frei. Wer was darf, regeln weiterhin die Zugriffsregeln oben.
+-- ------------------------------------------------------------
+grant usage on schema public to authenticated, service_role;
+
+grant select, insert, delete on public.bookings to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select on public.admin_actions to authenticated;
+
+grant all on public.bookings, public.profiles, public.admin_actions to service_role;
+
+grant execute on function public.is_admin(uuid) to authenticated, service_role;
+grant execute on function public.admin_set_temp_password(uuid, text) to authenticated, service_role;
+grant execute on function public.admin_password_reset_email(uuid) to authenticated, service_role;
+
+
+-- ------------------------------------------------------------
+-- 8) Wachhalten
+-- Der GitHub-Job "Supabase wachhalten" ruft diese Funktion zweimal pro
+-- Woche auf, damit das kostenlose Projekt nicht pausiert wird. Sie liest
+-- keine Daten und ändert nichts, deshalb darf sie ohne Login laufen.
+-- ------------------------------------------------------------
+create or replace function public.keepalive_ping()
+returns integer
+language sql
+stable
+as $function$
+  select 1;
+$function$;
+
+grant execute on function public.keepalive_ping() to anon, authenticated, service_role;

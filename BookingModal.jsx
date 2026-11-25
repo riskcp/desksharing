@@ -33,6 +33,10 @@ export default function BookingModal({
     );
   };
 
+  // Tage, an denen man inzwischen schon einen Platz hat (z. B. nach einer
+  // teilweise erfolgreichen Serienbuchung), nicht noch einmal mitschicken.
+  const datesToBook = selectedDates.filter((key) => !blocked(key));
+
   const isMine = existingBooking && existingBooking.user_id === myUserId;
 
   return (
@@ -114,7 +118,7 @@ export default function BookingModal({
                           >
                             <input
                               type="checkbox"
-                              checked={selectedDates.includes(d.key)}
+                              checked={!isBlocked && selectedDates.includes(d.key)}
                               disabled={isBlocked}
                               onChange={() => toggleDate(d.key)}
                             />
@@ -129,13 +133,13 @@ export default function BookingModal({
 
                 <button
                   className="btn-primary"
-                  disabled={busy || selectedDates.length === 0}
-                  onClick={() => onBook(resource, selectedDates, myName)}
+                  disabled={busy || datesToBook.length === 0}
+                  onClick={() => onBook(resource, datesToBook, myName)}
                 >
                   {busy
                     ? "Buche…"
-                    : selectedDates.length > 1
-                    ? `Für ${myName} buchen (${selectedDates.length} Tage)`
+                    : datesToBook.length > 1
+                    ? `Für ${myName} buchen (${datesToBook.length} Tage)`
                     : `Für ${myName} buchen`}
                 </button>
               </>
